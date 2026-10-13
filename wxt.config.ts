@@ -6,7 +6,8 @@ export default defineConfig({
   manifest: {
     permissions: [
       'storage',
-      'declarativeNetRequest',
+      'declarativeNetRequest'
     ],
-  },
+    host_permissions: ['<all_urls>']
+  }
 });

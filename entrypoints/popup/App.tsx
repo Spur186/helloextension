@@ -5,6 +5,7 @@ import './App.css';
 import NewLogin from './Newlogin.tsx';
 import { ArrowRight, Lock, LockOpen,CircleSlash,ChevronDown } from 'lucide-react';
 function App() {
+  //almost all state variables created here
   const [website,setWebsite] = useState('');
   const [blockedSites,setblockedsites] = useState<string[]>([]);
   const [passwordInput,setPasswordInput] = useState('')
@@ -13,23 +14,36 @@ function App() {
   const [password_list,setpassword_list] = useState<string[]>([]);
   const [showNewLogin, setShowNewLogin] = useState(false);
   const [showBlockedSites, setShowBlockedSites] = useState(false);
+  const [redirectSite, setRedirectSite] = useState('');
+  const [redirectSites, setRedirectSites] = useState<string[]>([]);
+  const [showRedirectSites, setShowRedirectSites] = useState(false);
   const  handleClick = () => {
     setShowNewLogin(true);
 
   };
 
-
-  useEffect(() => {
+//useeffect for inital loading of blocked and redirect sites from browser storage
+useEffect(() => {
     loadBlockedSites();
   }, []);
-  useEffect(() => {
+useEffect(() => {
     browser.storage.session?.get(["unlocked"], (result) => {
       if (result.unlocked) {
         setIsLocked(false);
       }
     });
   }, []);
+useEffect(() => {
+  loadRedirectSites();
+}, []);
+//almost all functions for adding, deleting, and loading blocked and redirect sites are created here
+async function loadRedirectSites() {
+  const result = await browser.storage.local.get('redirectSites');
 
+  setRedirectSites(
+    (result.redirectSites as string[] | undefined) ?? []
+  );
+}
 
 async function loadBlockedSites() {
     const result = await browser.storage.local.get('blockedSites');
@@ -73,6 +87,7 @@ async function EnterSite (){
   }
 
 }
+//this one communicates with newlogin to add passwords to the password list, the ! is j so theres no duplicates and stuff
 async function addPassword (newPass:string){
   if (!password_list.includes(newPass)){
     setpassword_list(prev => [...prev, newPass]);
@@ -81,6 +96,51 @@ async function addPassword (newPass:string){
   }
  
 }
+async function addRedirectSite() {
+  if (redirectSite.trim() === '') return;
+
+  let url: URL;
+
+  try {
+    url = new URL(
+      redirectSite.startsWith('http')
+        ? redirectSite
+        : `https://${redirectSite}`
+    );
+
+    if (!['http:', 'https:'].includes(url.protocol)) {
+      throw new Error('Invalid protocol');
+    }
+  } catch {
+    alert('Enter a valid website URL');
+    return;
+  }
+
+  const result = await browser.storage.local.get('redirectSites');
+
+  const sites = (result.redirectSites as string[] | undefined) ?? [];
+
+  if (!sites.includes(url.href)) {
+    const updatedSites = [...sites, url.href];
+
+    await browser.storage.local.set({
+      redirectSites: updatedSites,
+    });
+
+    setRedirectSites(updatedSites);
+  }
+
+  setRedirectSite('');
+}
+async function deleteRedirectSites() {
+  await browser.storage.local.set({
+    redirectSites: [],
+  });
+
+  setRedirectSites([]);
+}
+
+
     if (showNewLogin) {
     return <NewLogin addPassword={addPassword} />;
   }
@@ -113,60 +173,139 @@ if (isLocked) {
   )
 }
 return (
-    <>
-      <div className="login-container">
-      <input type="text"
-      placeholder='Website to be blocked'
-      value = {website}
-      onChange={(event) => setWebsite(event.target.value)}
-      />
-  <button
-    className="enter-icon3"
-    onClick={addWebsite}
-    aria-label="Enter"
-  >
-    <CircleSlash size={20} />
-  </button>
-<div className="dropdown-container">
-  <button
-    className="dropdown-button"
-    onClick={() => setShowBlockedSites(!showBlockedSites)}
-  >
-    Blocked Websites ({blockedSites.length})
-    <ChevronDown
-      size={18}
-      className={showBlockedSites ? 'rotate' : ''}
-    />
-  </button>
+  <>
+    <div className="login-container">
 
-  {showBlockedSites && (
-    <div className="dropdown-content">
-      <ul className="dropdown-list">
-        {blockedSites.length === 0 ? (
-          <li>No blocked websites</li>
-        ) : (
-          blockedSites.map((site, index) => (
-            <li key={index}>{site}</li>
-          ))
-        )}
-      </ul>
-
-      <button
-        className="clear-list-button"
-        onClick={deletewebsite}
-        disabled={blockedSites.length === 0}
-      >
-        Clear List
-      </button>
-    </div>
-  )}
-</div>
-  
-      </div>
       
 
-    </>
-  );
+      <div className="input-container">
+        <input
+          type="text"
+          placeholder="Website to be blocked"
+          value={website}
+          onChange={(event) => setWebsite(event.target.value)}
+        />
+
+        <button
+          className="enter-icon"
+          onClick={addWebsite}
+          aria-label="Block website"
+        >
+          <CircleSlash size={20} />
+        </button>
+      </div>
+
+      <div className="dropdown-container">
+        <button
+          className="dropdown-button"
+          onClick={() => setShowBlockedSites(!showBlockedSites)}
+          aria-expanded={showBlockedSites}
+        >
+          Blocked Websites ({blockedSites.length})
+
+          <ChevronDown
+            size={18}
+            className={showBlockedSites ? 'rotate' : ''}
+          />
+        </button>
+
+        {showBlockedSites && (
+          <div className="dropdown-content">
+
+            <ul className="dropdown-list">
+              {blockedSites.length === 0 ? (
+                <li>No blocked websites</li>
+              ) : (
+                blockedSites.map((site, index) => (
+                  <li key={index}>{site}</li>
+                ))
+              )}
+            </ul>
+
+            <button
+              className="clear-list-button"
+              onClick={deletewebsite}
+              disabled={blockedSites.length === 0}
+            >
+              Clear List
+            </button>
+
+          </div>
+        )}
+      </div>
+
+      
+
+      <div className="input-container">
+        <input
+          type="text"
+          placeholder="Website to redirect to"
+          value={redirectSite}
+          onChange={(event) => setRedirectSite(event.target.value)}
+        />
+
+        <button
+          className="enter-icon"
+          onClick={addRedirectSite}
+          aria-label="Add redirect website"
+        >
+          <ArrowRight size={20} />
+        </button>
+      </div>
+
+      <div className="dropdown-container">
+        <button
+          className="dropdown-button"
+          onClick={() => setShowRedirectSites(!showRedirectSites)}
+          aria-expanded={showRedirectSites}
+        >
+          Redirect Websites ({redirectSites.length})
+
+          <ChevronDown
+            size={18}
+            className={showRedirectSites ? 'rotate' : ''}
+          />
+        </button>
+
+        {showRedirectSites && (
+          <div className="dropdown-content">
+
+            <ul className="dropdown-list">
+              {redirectSites.length === 0 ? (
+                <li>No redirect websites</li>
+              ) : (
+                redirectSites.map((site, index) => (
+                  <li key={index}>{site}</li>
+                ))
+              )}
+            </ul>
+
+            <button
+              className="clear-list-button"
+              onClick={deleteRedirectSites}
+              disabled={redirectSites.length === 0}
+            >
+              Clear List
+            </button>
+
+
+          </div>
+          
+        )}
+                    <button onClick = {() => {
+              setIsLocked(true)
+              browser.storage.session?.set({
+                unlocked: false
+              });
+            }} className="lock-button">
+
+              Lock app?
+            </button>
+      </div>
+
+    </div>
+  </>
+);
 }
 
 
